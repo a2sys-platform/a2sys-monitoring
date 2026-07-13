@@ -1,5 +1,9 @@
 # Connect Grafana → a2sys-bench Cloud SQL (Private Service Connect)
 
+> **Status: LIVE.** PSC endpoint `cloudsql-a2sys-bench-psc` (internal IP `10.10.0.15`,
+> pscConnectionStatus ACCEPTED) in `devops-dev-vpc`. Grafana datasource `a2sys-bench`
+> connects directly and passes health check. This runbook is the reproduce/rollback record.
+
 Grafana runs on `devops-dev` (project `a2sys-devops-dev`, VPC `devops-dev-vpc`).
 The DB `a2sys-bench-pg-poc` is **private-IP-only** in a **different project** (`cs-poc`,
 default VPC). PSC bridges the two privately: cs-poc publishes a PSC service attachment,
