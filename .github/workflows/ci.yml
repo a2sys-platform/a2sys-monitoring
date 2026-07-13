@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # datreeio/CRDs-catalog on main: has Gateway API (HTTPRoute) + many GKE CRDs.
+  # Pinning to a release tag drops these schemas (validation silently skipped), so keep main.
+  CRD_SCHEMAS: 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0            # full history for gitleaks
+
+      - name: Secret scan (gitleaks)
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_linux_x64.tar.gz | tar xz gitleaks
+          ./gitleaks detect --source . --redact --no-banner --exit-code 1
+
+      - name: Validate dashboard JSON
+        run: |
+          shopt -s nullglob
+          fail=0
+          for f in grafana/dashboards/*.json; do
+            echo "· $f"; jq empty "$f" || fail=1
+          done
+          exit $fail
+
+      - name: Validate YAML parses
+        run: |
+          python3 - <<'PY'
+          import glob, sys, yaml
+          bad = 0
+          for f in glob.glob("**/*.yaml", recursive=True) + glob.glob("**/*.yml", recursive=True):
+              try:
+                  list(yaml.safe_load_all(open(f))); print("·", f)
+              except Exception as e:
+                  print("✗", f, e); bad = 1
+          sys.exit(bad)
+          PY
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.0
+
+      - name: Install kubeconform
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz kubeconform
+          sudo mv kubeconform /usr/local/bin/
+
+      - name: Helm render + validate rendered output
+        run: |
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm repo update
+          helm template a2sys-monitoring grafana/grafana --version 10.5.15 \
+            -f grafana/helm/values.yaml -f grafana/helm/values-datasources.yaml \
+            | kubeconform -strict -summary -ignore-missing-schemas \
+                -schema-location default -schema-location "$CRD_SCHEMAS"
+
+      - name: Validate raw manifests
+        run: |
+          kubeconform -strict -summary -ignore-missing-schemas \
+            -schema-location default -schema-location "$CRD_SCHEMAS" \
+            grafana/manifests sources/gmp/manifests
