@@ -1,36 +1,47 @@
 # a2sys-monitoring
 
-Grafana on the existing **devops-dev** GKE cluster. Metrics come from Google
-Managed Prometheus; there is no self-managed Prometheus.
+Monitoring stack for the **devops-dev** GKE cluster. Today it runs **Grafana**;
+the layout is organized so more tools (e.g. Kibana) can be added alongside it.
 
 - **Cluster**: `devops-dev` (project `a2sys-devops-dev`, region `asia-northeast3`)
 - **Namespace**: `a2sys-monitoring`
-- **Helm release**: `a2sys-monitoring`
-- **Chart**: `grafana/grafana`
 
-**Datasources**
-- `GMP` (default) — Google Managed Prometheus, via the `gmp-frontend` proxy → see [`gmp/`](gmp/)
-- `a2sys-bench` — a2sys-bench Cloud SQL (Postgres) over PSC → see [`db-connection/`](db-connection/)
+## Layout
 
-> ⚠️ Shared **GKE Autopilot** cluster. Metrics are served by the cluster's Google
-> Managed Prometheus, so this release runs only Grafana. Container requests are kept
-> small — Autopilot otherwise defaults unset requests to 500m CPU / 2Gi memory.
+```
+a2sys-monitoring/
+├── grafana/                    # Grafana (Helm chart grafana/grafana)
+│   ├── values.yaml             #   base: LoadBalancer, admin secret, persistence, dashboard provider
+│   ├── values-datasources.yaml #   datasource provisioning (GMP + a2sys-bench)
+│   └── dashboards/             #   provisioned dashboards (one JSON per board)
+├── sources/                    # shared data-source backends (reused by any tool)
+│   ├── gmp/                    #   Google Managed Prometheus query frontend
+│   └── a2sys-bench-db/         #   a2sys-bench Cloud SQL over Private Service Connect
+└── <tool>/                     # future tools (e.g. kibana/) go here, same pattern
+```
 
-## Files
+**Principle:** each *tool* is a self-contained top-level directory (its own Helm
+values / manifests / dashboards). Anything a tool *connects to* — metrics backends,
+databases — lives under `sources/` so multiple tools can share it.
 
-| Path | Purpose |
-|---|---|
-| `values.yaml` | Grafana base (LoadBalancer, admin secret, persistence, requests) |
-| `values-db.yaml` | Datasources overlay (GMP + a2sys-bench) |
-| `gmp/` | Google Managed Prometheus query frontend + datasource |
-| `db-connection/` | PSC path + Grafana → Cloud SQL datasource |
+## Grafana
 
-## Prerequisites
+Deployed with the `grafana/grafana` Helm chart. Metrics come from Google Managed
+Prometheus (no self-managed Prometheus). Datasources:
+
+- `GMP` (default) — Google Managed Prometheus via the `gmp-frontend` proxy → [`sources/gmp/`](sources/gmp/)
+- `a2sys-bench` — Cloud SQL (Postgres) over PSC → [`sources/a2sys-bench-db/`](sources/a2sys-bench-db/)
+
+Dashboards → [`grafana/dashboards/`](grafana/dashboards/).
+
+> ⚠️ Shared **GKE Autopilot** cluster. Keep container requests small — Autopilot
+> otherwise defaults unset requests to 500m CPU / 2Gi memory.
+
+### Prerequisites
 
 ```sh
 gcloud container clusters get-credentials devops-dev \
   --region asia-northeast3 --project a2sys-devops-dev
-# kubectl needs the auth plugin on PATH:
 export USE_GKE_GCLOUD_AUTH_PLUGIN=True
 export PATH="$(gcloud info --format='value(installation.sdk_root)')/bin:$PATH"
 
@@ -38,7 +49,7 @@ helm repo add grafana https://grafana.github.io/helm-charts
 helm repo update grafana
 ```
 
-## Deploy / upgrade
+### Deploy / upgrade (run from repo root)
 
 ```sh
 kubectl create namespace a2sys-monitoring --dry-run=client -o yaml | kubectl apply -f -
@@ -50,29 +61,33 @@ kubectl -n a2sys-monitoring create secret generic grafana-admin \
 
 helm upgrade --install a2sys-monitoring grafana/grafana \
   --namespace a2sys-monitoring \
-  -f values.yaml -f values-db.yaml
+  -f grafana/values.yaml -f grafana/values-datasources.yaml
 ```
 
 For the datasources to resolve, also apply the GMP frontend + grant `monitoring.viewer`
-(see [`gmp/`](gmp/)) and create the `bench-db` secret (see [`db-connection/`](db-connection/)).
+([`sources/gmp/`](sources/gmp/)) and create the `bench-db` secret
+([`sources/a2sys-bench-db/`](sources/a2sys-bench-db/)).
 
-## Access Grafana
+### Access
 
 ```sh
-# External IP (LoadBalancer)
 kubectl -n a2sys-monitoring get svc a2sys-monitoring-grafana \
-  -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-
-# Admin password
+  -o jsonpath='{.status.loadBalancer.ingress[0].ip}'                    # external IP
 kubectl -n a2sys-monitoring get secret grafana-admin \
-  -o jsonpath='{.data.admin-password}' | base64 -d
+  -o jsonpath='{.data.admin-password}' | base64 -d                      # admin password
 ```
 
 Open `http://<EXTERNAL-IP>` → login `admin` / retrieved password.
 
-## Uninstall
+### Uninstall
 
 ```sh
 helm uninstall a2sys-monitoring -n a2sys-monitoring
-kubectl delete namespace a2sys-monitoring   # also removes PVCs
 ```
+
+## Adding a new tool (e.g. Kibana)
+
+1. Create a top-level directory `<tool>/` with its Helm values / manifests.
+2. If it needs a new backend, add it under `sources/<backend>/`; reuse existing ones otherwise.
+3. Deploy it as its **own** Helm release (keep releases per-tool), in this same namespace.
+4. Document it in this README and the [wiki](https://github.com/a2sys-platform/a2sys-monitoring/wiki).

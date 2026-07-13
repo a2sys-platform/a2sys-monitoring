@@ -10,7 +10,7 @@ through a small **query frontend** proxy.
   (`prometheus-engine/frontend`, matched to the cluster's GMP version `v0.18.0-gke.2`)
   proxies PromQL to the Managed Prometheus API for project `a2sys-devops-dev`.
 - Grafana datasource `GMP` (type `prometheus`, default) → `http://gmp-frontend.a2sys-monitoring.svc:9090`
-  (defined in `../values-db.yaml`).
+  (defined in `../values-datasources.yaml`).
 
 ## Auth (Workload Identity)
 
@@ -27,10 +27,10 @@ gcloud projects add-iam-policy-binding a2sys-devops-dev \
 ## Deploy
 
 ```sh
-kubectl apply -f gmp/frontend.yaml
+kubectl apply -f sources/gmp/frontend.yaml
 # grant monitoring.viewer (above), then provision the datasource:
 helm upgrade a2sys-monitoring grafana/grafana \
-  -n a2sys-monitoring -f values.yaml -f values-db.yaml
+  -n a2sys-monitoring -f grafana/values.yaml -f grafana/values-datasources.yaml
 ```
 
 ## Verify

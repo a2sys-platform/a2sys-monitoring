@@ -1,0 +1,114 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 0,
+  "schemaVersion": 39,
+  "tags": ["a2sys-bench"],
+  "time": { "from": "now-90d", "to": "now" },
+  "timezone": "browser",
+  "title": "a2sys-bench Overview",
+  "uid": "a2sys-bench-overview",
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Total Runs",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "a2sysbench" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value" },
+      "targets": [ { "refId": "A", "datasource": { "type": "postgres", "uid": "a2sysbench" }, "format": "table", "rawQuery": true, "editorMode": "code", "rawSql": "SELECT count(*) AS runs FROM runs;" } ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Total Trials",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "a2sysbench" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value" },
+      "targets": [ { "refId": "A", "datasource": { "type": "postgres", "uid": "a2sysbench" }, "format": "table", "rawQuery": true, "editorMode": "code", "rawSql": "SELECT count(*) AS trials FROM run_trials;" } ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Resolve Rate",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "a2sysbench" },
+      "fieldConfig": { "defaults": { "unit": "percent", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "orange", "value": 25 }, { "color": "green", "value": 50 } ] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value" },
+      "targets": [ { "refId": "A", "datasource": { "type": "postgres", "uid": "a2sysbench" }, "format": "table", "rawQuery": true, "editorMode": "code", "rawSql": "SELECT round(100.0 * avg(CASE WHEN is_resolved THEN 1 ELSE 0 END), 1) AS resolve_pct FROM run_trials;" } ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Total Cost (USD)",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "a2sysbench" },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 2, "color": { "mode": "thresholds" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value" },
+      "targets": [ { "refId": "A", "datasource": { "type": "postgres", "uid": "a2sysbench" }, "format": "table", "rawQuery": true, "editorMode": "code", "rawSql": "SELECT round(COALESCE(sum(cost_usd),0)::numeric, 2) AS cost_usd FROM run_trials;" } ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Total Tokens",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "a2sysbench" },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "thresholds" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value" },
+      "targets": [ { "refId": "A", "datasource": { "type": "postgres", "uid": "a2sysbench" }, "format": "table", "rawQuery": true, "editorMode": "code", "rawSql": "SELECT COALESCE(sum(n_total_tokens),0) AS tokens FROM run_trials;" } ]
+    },
+    {
+      "id": 6,
+      "type": "barchart",
+      "title": "Resolve Rate by Model (%)",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "postgres", "uid": "a2sysbench" },
+      "fieldConfig": { "defaults": { "unit": "percent", "color": { "mode": "continuous-GrYlRd" } }, "overrides": [] },
+      "options": { "orientation": "horizontal", "xField": "model", "showValue": "always", "legend": { "showLegend": false } },
+      "targets": [ { "refId": "A", "datasource": { "type": "postgres", "uid": "a2sysbench" }, "format": "table", "rawQuery": true, "editorMode": "code", "rawSql": "SELECT r.model, round(100.0 * avg(CASE WHEN t.is_resolved THEN 1 ELSE 0 END), 1) AS resolve_pct FROM run_trials t JOIN runs r USING (run_id) GROUP BY r.model ORDER BY resolve_pct DESC;" } ]
+    },
+    {
+      "id": 7,
+      "type": "piechart",
+      "title": "Trials by Model",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "postgres", "uid": "a2sysbench" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "pieType": "donut", "legend": { "displayMode": "table", "placement": "right", "values": ["value"] } },
+      "targets": [ { "refId": "A", "datasource": { "type": "postgres", "uid": "a2sysbench" }, "format": "table", "rawQuery": true, "editorMode": "code", "rawSql": "SELECT r.model, count(*) AS trials FROM run_trials t JOIN runs r USING (run_id) GROUP BY r.model ORDER BY trials DESC;" } ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Trials over Time (daily)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
+      "datasource": { "type": "postgres", "uid": "a2sysbench" },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 60, "lineWidth": 1 } }, "overrides": [] },
+      "options": { "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "targets": [ { "refId": "A", "datasource": { "type": "postgres", "uid": "a2sysbench" }, "format": "time_series", "rawQuery": true, "editorMode": "code", "rawSql": "SELECT date_trunc('day', started_at) AS \"time\", count(*) AS trials FROM run_trials WHERE started_at IS NOT NULL GROUP BY 1 ORDER BY 1;" } ]
+    },
+    {
+      "id": 9,
+      "type": "barchart",
+      "title": "Total Tokens by Model",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
+      "datasource": { "type": "postgres", "uid": "a2sysbench" },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "palette-classic" } }, "overrides": [] },
+      "options": { "orientation": "horizontal", "xField": "model", "showValue": "auto", "legend": { "showLegend": false } },
+      "targets": [ { "refId": "A", "datasource": { "type": "postgres", "uid": "a2sysbench" }, "format": "table", "rawQuery": true, "editorMode": "code", "rawSql": "SELECT r.model, COALESCE(sum(t.n_total_tokens),0) AS tokens FROM run_trials t JOIN runs r USING (run_id) GROUP BY r.model ORDER BY tokens DESC;" } ]
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Recent Runs",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 21 },
+      "datasource": { "type": "postgres", "uid": "a2sysbench" },
+      "fieldConfig": { "defaults": {}, "overrides": [ { "matcher": { "id": "byName", "options": "cost_usd" }, "properties": [ { "id": "unit", "value": "currencyUSD" }, { "id": "decimals", "value": 2 } ] } ] },
+      "options": { "showHeader": true, "cellHeight": "sm" },
+      "targets": [ { "refId": "A", "datasource": { "type": "postgres", "uid": "a2sysbench" }, "format": "table", "rawQuery": true, "editorMode": "code", "rawSql": "SELECT started_at, run_name, agent, model, benchmark, status, tasks_resolved, expected_total, cost_usd FROM runs ORDER BY started_at DESC NULLS LAST LIMIT 20;" } ]
+    }
+  ]
+}

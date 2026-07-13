@@ -1,0 +1,48 @@
+# grafana/grafana chart values for a2sys-monitoring
+# Cluster: devops-dev (a2sys-devops-dev, asia-northeast3) / namespace: a2sys-monitoring
+# Chart: grafana/grafana
+#
+# Grafana only. Metrics come from Google Managed Prometheus (see sources/gmp/); the
+# a2sys-bench Cloud SQL datasource is in sources/a2sys-bench-db/. Datasources
+# themselves are defined in values-datasources.yaml.
+
+service:
+  type: LoadBalancer
+
+# admin credentials come from the pre-created Secret `grafana-admin` (not in this repo)
+admin:
+  existingSecret: grafana-admin
+  userKey: admin-user
+  passwordKey: admin-password
+
+persistence:
+  enabled: true
+  storageClassName: standard-rwo
+  size: 5Gi
+
+# PVC is ReadWriteOnce, so the new pod can't mount while the old one holds it.
+# Recreate tears the old pod down first (brief downtime) instead of surging.
+deploymentStrategy:
+  type: Recreate
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Provisioned dashboards. JSON lives in dashboards/ (repo) and is mounted from the
+# ConfigMap `a2sys-bench-dashboards` (created from those files — see dashboards/README.md).
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: default
+        orgId: 1
+        folder: ""
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+dashboardsConfigMaps:
+  default: a2sys-bench-dashboards
