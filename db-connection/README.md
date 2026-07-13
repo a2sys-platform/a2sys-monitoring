@@ -84,7 +84,7 @@ kubectl -n a2sys-monitoring create secret generic bench-db \
   --from-literal=password="$PW"
 
 cd ..   # a2sys-monitoring/
-helm upgrade --install a2sys-monitoring prometheus-community/kube-prometheus-stack \
+helm upgrade --install a2sys-monitoring grafana/grafana \
   -n a2sys-monitoring -f values.yaml -f values-db.yaml
 ```
 
@@ -96,7 +96,7 @@ Or query in Explore: `SELECT count(*) FROM runs;`
 ## Rollback
 
 ```sh
-helm upgrade a2sys-monitoring prometheus-community/kube-prometheus-stack -n a2sys-monitoring -f values.yaml
+helm upgrade a2sys-monitoring grafana/grafana -n a2sys-monitoring -f values.yaml -f values-db.yaml
 kubectl -n a2sys-monitoring delete secret bench-db
 gcloud compute forwarding-rules delete cloudsql-a2sys-bench-psc --project a2sys-devops-dev --region asia-northeast3
 gcloud compute addresses delete cloudsql-a2sys-bench-psc --project a2sys-devops-dev --region asia-northeast3

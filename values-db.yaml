@@ -1,35 +1,44 @@
-# Overlay: wire the a2sys-bench Cloud SQL (Postgres) into Grafana as a datasource.
-# Apply ON TOP of values.yaml AFTER the PSC endpoint exists and the `bench-db`
-# secret is created (see db-connection/README.md):
-#   helm upgrade --install a2sys-monitoring prometheus-community/kube-prometheus-stack \
+# Datasources overlay for the grafana/grafana chart.
+#   - GMP         : Google Managed Prometheus, via the gmp-frontend proxy — see gmp/
+#   - a2sys-bench : a2sys-bench Cloud SQL (Postgres), via PSC internal IP — see db-connection/
+# Apply on top of values.yaml:
+#   helm upgrade --install a2sys-monitoring grafana/grafana \
 #     -n a2sys-monitoring -f values.yaml -f values-db.yaml
-#
-# Grafana connects DIRECTLY to the DB over the PSC internal IP (no Auth Proxy needed).
-# Host/user/password come from the k8s Secret `bench-db` (NOT stored in this repo).
+# The DB host/user/password come from the k8s Secret `bench-db` (NOT stored in this repo).
 
-grafana:
-  envValueFrom:
-    DB_HOST:
-      secretKeyRef:
-        name: bench-db
-        key: host
-    DB_USER:
-      secretKeyRef:
-        name: bench-db
-        key: user
-    DB_PASS:
-      secretKeyRef:
-        name: bench-db
-        key: password
-  additionalDataSources:
-    - name: a2sys-bench
-      type: postgres
-      access: proxy
-      url: $DB_HOST:5432
-      user: $DB_USER
-      jsonData:
-        database: a2sys_bench
-        sslmode: require
-        postgresVersion: 1600
-      secureJsonData:
-        password: $DB_PASS
+envValueFrom:
+  DB_HOST:
+    secretKeyRef:
+      name: bench-db
+      key: host
+  DB_USER:
+    secretKeyRef:
+      name: bench-db
+      key: user
+  DB_PASS:
+    secretKeyRef:
+      name: bench-db
+      key: password
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: GMP
+        type: prometheus
+        access: proxy
+        url: http://gmp-frontend.a2sys-monitoring.svc:9090
+        isDefault: true
+        jsonData:
+          httpMethod: POST
+      - name: a2sys-bench
+        type: postgres
+        access: proxy
+        url: $DB_HOST:5432
+        user: $DB_USER
+        jsonData:
+          database: a2sys_bench
+          sslmode: require
+          postgresVersion: 1600
+        secureJsonData:
+          password: $DB_PASS

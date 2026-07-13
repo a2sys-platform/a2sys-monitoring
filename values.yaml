@@ -1,68 +1,26 @@
-# kube-prometheus-stack values for a2sys-monitoring
+# grafana/grafana chart values for a2sys-monitoring
 # Cluster: devops-dev (a2sys-devops-dev, asia-northeast3) / namespace: a2sys-monitoring
-# Chart: prometheus-community/kube-prometheus-stack
+# Chart: grafana/grafana
 #
-# NOTE: devops-dev is a GKE Autopilot cluster. The following are disabled because
-# Autopilot forbids them:
-#   - node-exporter: needs hostPath /proc,/sys,/ and hostNetwork/hostPID (blocked)
-#   - control-plane scrapers (kube-controller-manager/scheduler/proxy/etcd, coreDns):
-#     their Services target the managed kube-system namespace, which cannot be patched.
-# Node/system metrics on Autopilot come from Google Managed Prometheus (gmp-system).
-# kubelet (cAdvisor) scraping stays enabled and provides pod/container metrics.
+# Grafana only. Metrics come from Google Managed Prometheus (see gmp/); the
+# a2sys-bench Cloud SQL datasource is in db-connection/. Datasources themselves
+# are defined in values-db.yaml.
 
-nodeExporter:
-  enabled: false
-kubeControllerManager:
-  enabled: false
-kubeScheduler:
-  enabled: false
-kubeProxy:
-  enabled: false
-kubeEtcd:
-  enabled: false
-coreDns:
-  enabled: false
+service:
+  type: LoadBalancer
 
-grafana:
-  service:
-    type: LoadBalancer
-  # admin credentials come from the pre-created Secret `grafana-admin` (not stored in this repo)
-  admin:
-    existingSecret: grafana-admin
-    userKey: admin-user
-    passwordKey: admin-password
-  persistence:
-    enabled: true
-    storageClassName: standard-rwo
-    size: 5Gi
-  resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
+# admin credentials come from the pre-created Secret `grafana-admin` (not in this repo)
+admin:
+  existingSecret: grafana-admin
+  userKey: admin-user
+  passwordKey: admin-password
 
-prometheus:
-  prometheusSpec:
-    retention: 7d
-    resources:
-      requests:
-        cpu: 200m
-        memory: 512Mi
-    storageSpec:
-      volumeClaimTemplate:
-        spec:
-          storageClassName: standard-rwo
-          accessModes: ["ReadWriteOnce"]
-          resources:
-            requests:
-              storage: 20Gi
+persistence:
+  enabled: true
+  storageClassName: standard-rwo
+  size: 5Gi
 
-alertmanager:
-  alertmanagerSpec:
-    storage:
-      volumeClaimTemplate:
-        spec:
-          storageClassName: standard-rwo
-          accessModes: ["ReadWriteOnce"]
-          resources:
-            requests:
-              storage: 2Gi
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
