@@ -1,0 +1,1376 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "tags": [
+    "a2sys-bench",
+    "agent-optimization"
+  ],
+  "title": "a2sys-bench Agent Optimization",
+  "uid": "a2sys-bench-agent-opt",
+  "timezone": "browser",
+  "time": {
+    "from": "now-90d",
+    "to": "now"
+  },
+  "refresh": "",
+  "templating": {
+    "list": [
+      {
+        "type": "query",
+        "name": "agent",
+        "label": "Agent",
+        "datasource": {
+          "type": "postgres",
+          "uid": "a2sysbench"
+        },
+        "query": "SELECT DISTINCT agent FROM runs WHERE agent <> '' ORDER BY 1",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "regex": ""
+      },
+      {
+        "type": "query",
+        "name": "benchmark",
+        "label": "Benchmark",
+        "datasource": {
+          "type": "postgres",
+          "uid": "a2sysbench"
+        },
+        "query": "SELECT DISTINCT benchmark FROM runs WHERE benchmark <> '' ORDER BY 1",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "regex": ""
+      },
+      {
+        "type": "query",
+        "name": "subset",
+        "label": "Subset",
+        "datasource": {
+          "type": "postgres",
+          "uid": "a2sysbench"
+        },
+        "query": "SELECT DISTINCT COALESCE(NULLIF(subset,''),'(none)') FROM runs WHERE benchmark IN (${benchmark:sqlstring}) ORDER BY 1",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "regex": ""
+      },
+      {
+        "type": "query",
+        "name": "model",
+        "label": "Model",
+        "datasource": {
+          "type": "postgres",
+          "uid": "a2sysbench"
+        },
+        "query": "SELECT DISTINCT model FROM runs WHERE model <> '' AND benchmark IN (${benchmark:sqlstring}) ORDER BY 1",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "regex": ""
+      },
+      {
+        "type": "query",
+        "name": "config",
+        "label": "Config",
+        "datasource": {
+          "type": "postgres",
+          "uid": "a2sysbench"
+        },
+        "query": "SELECT DISTINCT COALESCE(NULLIF(config_name,''),'(none)') FROM runs WHERE benchmark IN (${benchmark:sqlstring}) ORDER BY 1",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "regex": ""
+      },
+      {
+        "type": "query",
+        "name": "agent_version",
+        "label": "Agent Version",
+        "datasource": {
+          "type": "postgres",
+          "uid": "a2sysbench"
+        },
+        "query": "SELECT DISTINCT COALESCE(NULLIF(agent_version,''),'(none)') FROM run_trials ORDER BY 1",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "regex": ""
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 99,
+      "type": "text",
+      "title": "",
+      "transparent": true,
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### 🎯 Agent 최적화 대시보드\n사내 agent(예: `agent-prototype`)를 벤치 결과로 **튜닝**하기 위한 뷰입니다. 상단 **필터**(Agent·Benchmark·Subset·Model·Config·Version·기간)로 범위를 좁히면 아래 모든 패널이 반응합니다. 집계 대상은 완료된 run(`status = 'done'`)만.\n\n**4가지 결정 Row** — 🧭 *Model Selection*(어떤 모델) · 🔬 *Config A/B*(어떤 설정) · 📈 *Version Regression*(버전이 나아졌나) · 💰 *Cost Efficiency & Failures*(돈이 어디로).\n\n**활용 순서**\n1. **Agent** 필터를 최적화 대상(예: `agent-prototype`)으로 좁힌다.\n2. **Model Selection**에서 resolve%↑ · cost/resolved↓ 인 모델을 추린다.\n3. **Model**을 하나로 고정하고 **Config A/B**로 설정 변형을 비교한다.\n4. 버전을 올릴 때마다 **Version Regression**에서 `Δ vs prev`가 음수(회귀)인지 확인한다.\n5. **Hardest tasks · Exceptions**로 남은 실패를 파고든다.\n\n> ℹ️ 각 패널 제목 옆 **ⓘ** 아이콘에 설명이 있습니다. 비용/토큰 빈칸은 미기록(무료 모델 등)으로 정상이며, **tool 사용 정보는 아직 미포함**입니다. → [상세 가이드(위키)](https://github.com/a2sys-platform/a2sys-monitoring/wiki/Agent-%EC%B5%9C%EC%A0%81%ED%99%94-%EB%8C%80%EC%8B%9C%EB%B3%B4%EB%93%9C)"
+      }
+    },
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Trials",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 7
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "a2sysbench"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "a2sysbench"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT count(*) AS \"Trials\" FROM run_trials t JOIN runs r ON t.run_id = r.run_id WHERE r.status = 'done' AND r.agent IN (${agent:sqlstring}) AND r.benchmark IN (${benchmark:sqlstring}) AND COALESCE(NULLIF(r.subset,''),'(none)') IN (${subset:sqlstring}) AND r.model IN (${model:sqlstring}) AND COALESCE(NULLIF(r.config_name,''),'(none)') IN (${config:sqlstring}) AND COALESCE(NULLIF(t.agent_version,''),'(none)') IN (${agent_version:sqlstring}) AND $__timeFilter(t.finished_at);"
+        }
+      ],
+      "description": "필터에 해당하는 완료 trial 수 (run status='done')."
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Resolve Rate",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 7
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "a2sysbench"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 25
+              },
+              {
+                "color": "green",
+                "value": 50
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "a2sysbench"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT round(100.0 * avg(CASE WHEN t.is_resolved THEN 1 ELSE 0 END), 1) AS \"Resolve %\" FROM run_trials t JOIN runs r ON t.run_id = r.run_id WHERE r.status = 'done' AND r.agent IN (${agent:sqlstring}) AND r.benchmark IN (${benchmark:sqlstring}) AND COALESCE(NULLIF(r.subset,''),'(none)') IN (${subset:sqlstring}) AND r.model IN (${model:sqlstring}) AND COALESCE(NULLIF(r.config_name,''),'(none)') IN (${config:sqlstring}) AND COALESCE(NULLIF(t.agent_version,''),'(none)') IN (${agent_version:sqlstring}) AND $__timeFilter(t.finished_at);"
+        }
+      ],
+      "description": "resolve된 trial 비율. is_resolved=NULL 은 미해결로 계산."
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Total Cost",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 7
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "a2sysbench"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "a2sysbench"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT round(sum(t.cost_usd), 2) AS \"Total Cost\" FROM run_trials t JOIN runs r ON t.run_id = r.run_id WHERE r.status = 'done' AND r.agent IN (${agent:sqlstring}) AND r.benchmark IN (${benchmark:sqlstring}) AND COALESCE(NULLIF(r.subset,''),'(none)') IN (${subset:sqlstring}) AND r.model IN (${model:sqlstring}) AND COALESCE(NULLIF(r.config_name,''),'(none)') IN (${config:sqlstring}) AND COALESCE(NULLIF(t.agent_version,''),'(none)') IN (${agent_version:sqlstring}) AND $__timeFilter(t.finished_at);"
+        }
+      ],
+      "description": "선택 범위 trial 비용 합계. NULL 비용(미기록)은 제외됨."
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Cost / Resolved",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 7
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "a2sysbench"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "a2sysbench"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT round(sum(t.cost_usd) / NULLIF(sum(CASE WHEN t.is_resolved THEN 1 ELSE 0 END), 0), 4) AS \"Cost/Resolved\" FROM run_trials t JOIN runs r ON t.run_id = r.run_id WHERE r.status = 'done' AND r.agent IN (${agent:sqlstring}) AND r.benchmark IN (${benchmark:sqlstring}) AND COALESCE(NULLIF(r.subset,''),'(none)') IN (${subset:sqlstring}) AND r.model IN (${model:sqlstring}) AND COALESCE(NULLIF(r.config_name,''),'(none)') IN (${config:sqlstring}) AND COALESCE(NULLIF(t.agent_version,''),'(none)') IN (${agent_version:sqlstring}) AND $__timeFilter(t.finished_at);"
+        }
+      ],
+      "description": "resolve 1건당 평균 비용 = 총비용 / resolve 수. 낮을수록 효율적."
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Avg Tokens / Trial",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 7
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "a2sysbench"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "a2sysbench"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT round(avg(t.n_total_tokens), 0) AS \"Avg Tokens/Trial\" FROM run_trials t JOIN runs r ON t.run_id = r.run_id WHERE r.status = 'done' AND r.agent IN (${agent:sqlstring}) AND r.benchmark IN (${benchmark:sqlstring}) AND COALESCE(NULLIF(r.subset,''),'(none)') IN (${subset:sqlstring}) AND r.model IN (${model:sqlstring}) AND COALESCE(NULLIF(r.config_name,''),'(none)') IN (${config:sqlstring}) AND COALESCE(NULLIF(t.agent_version,''),'(none)') IN (${agent_version:sqlstring}) AND $__timeFilter(t.finished_at);"
+        }
+      ],
+      "description": "trial당 평균 총토큰(input+output)."
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Exception Rate",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 7
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "a2sysbench"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 10
+              },
+              {
+                "color": "red",
+                "value": 25
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "a2sysbench"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT round(100.0 * avg(CASE WHEN t.exception_type IS NOT NULL AND t.exception_type <> '' THEN 1 ELSE 0 END), 1) AS \"Exception %\" FROM run_trials t JOIN runs r ON t.run_id = r.run_id WHERE r.status = 'done' AND r.agent IN (${agent:sqlstring}) AND r.benchmark IN (${benchmark:sqlstring}) AND COALESCE(NULLIF(r.subset,''),'(none)') IN (${subset:sqlstring}) AND r.model IN (${model:sqlstring}) AND COALESCE(NULLIF(r.config_name,''),'(none)') IN (${config:sqlstring}) AND COALESCE(NULLIF(t.agent_version,''),'(none)') IN (${agent_version:sqlstring}) AND $__timeFilter(t.finished_at);"
+        }
+      ],
+      "description": "예외로 끝난 trial 비율. 높을수록 안정성 문제 신호."
+    },
+    {
+      "id": 10,
+      "type": "row",
+      "title": "🧭 Model Selection",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 11
+      },
+      "panels": []
+    },
+    {
+      "id": 11,
+      "type": "table",
+      "title": "Model comparison",
+      "description": "좌상단(높은 resolve% · 낮은 Cost/Resolved)이 최적. NULL 비용은 해당 모델에 비용 데이터가 없는 것.",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "a2sysbench"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Resolve %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Exception %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Avg Cost"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cost/Resolved"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Resolve %",
+            "desc": true
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "a2sysbench"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT r.model AS \"Model\", t.model_provider AS \"Provider\", count(*) AS \"Trials\", round(100.0 * avg(CASE WHEN t.is_resolved THEN 1 ELSE 0 END), 1) AS \"Resolve %\", round(avg(t.cost_usd), 4) AS \"Avg Cost\", round(sum(t.cost_usd) / NULLIF(sum(CASE WHEN t.is_resolved THEN 1 ELSE 0 END), 0), 4) AS \"Cost/Resolved\", round(avg(t.n_output_tokens), 0) AS \"Avg Out Tokens\", round(100.0 * avg(CASE WHEN t.exception_type IS NOT NULL AND t.exception_type <> '' THEN 1 ELSE 0 END), 1) AS \"Exception %\" FROM run_trials t JOIN runs r ON t.run_id = r.run_id WHERE r.status = 'done' AND r.agent IN (${agent:sqlstring}) AND r.benchmark IN (${benchmark:sqlstring}) AND COALESCE(NULLIF(r.subset,''),'(none)') IN (${subset:sqlstring}) AND r.model IN (${model:sqlstring}) AND COALESCE(NULLIF(r.config_name,''),'(none)') IN (${config:sqlstring}) AND COALESCE(NULLIF(t.agent_version,''),'(none)') IN (${agent_version:sqlstring}) AND $__timeFilter(t.finished_at) GROUP BY r.model, t.model_provider ORDER BY \"Resolve %\" DESC;"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "barchart",
+      "title": "Resolve % by model",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "a2sysbench"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xField": "model",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "a2sysbench"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT r.model AS model, round(100.0 * avg(CASE WHEN t.is_resolved THEN 1 ELSE 0 END), 1) AS \"resolve_pct\" FROM run_trials t JOIN runs r ON t.run_id = r.run_id WHERE r.status = 'done' AND r.agent IN (${agent:sqlstring}) AND r.benchmark IN (${benchmark:sqlstring}) AND COALESCE(NULLIF(r.subset,''),'(none)') IN (${subset:sqlstring}) AND r.model IN (${model:sqlstring}) AND COALESCE(NULLIF(r.config_name,''),'(none)') IN (${config:sqlstring}) AND COALESCE(NULLIF(t.agent_version,''),'(none)') IN (${agent_version:sqlstring}) AND $__timeFilter(t.finished_at) GROUP BY r.model ORDER BY \"resolve_pct\" DESC;"
+        }
+      ],
+      "description": "모델별 resolve율. 높을수록 좋음."
+    },
+    {
+      "id": 13,
+      "type": "barchart",
+      "title": "Cost / resolved by model",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "a2sysbench"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xField": "model",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "a2sysbench"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT r.model AS model, round(sum(t.cost_usd) / NULLIF(sum(CASE WHEN t.is_resolved THEN 1 ELSE 0 END), 0), 4) AS \"cost_per_resolved\" FROM run_trials t JOIN runs r ON t.run_id = r.run_id WHERE r.status = 'done' AND r.agent IN (${agent:sqlstring}) AND r.benchmark IN (${benchmark:sqlstring}) AND COALESCE(NULLIF(r.subset,''),'(none)') IN (${subset:sqlstring}) AND r.model IN (${model:sqlstring}) AND COALESCE(NULLIF(r.config_name,''),'(none)') IN (${config:sqlstring}) AND COALESCE(NULLIF(t.agent_version,''),'(none)') IN (${agent_version:sqlstring}) AND $__timeFilter(t.finished_at) GROUP BY r.model HAVING sum(t.cost_usd) IS NOT NULL ORDER BY \"cost_per_resolved\" DESC NULLS LAST;"
+        }
+      ],
+      "description": "모델별 resolve 1건당 비용. 낮을수록 효율적. 비용 데이터 없는 모델은 제외."
+    },
+    {
+      "id": 20,
+      "type": "row",
+      "title": "🔬 Config A/B",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "panels": []
+    },
+    {
+      "id": 21,
+      "type": "table",
+      "title": "Config comparison",
+      "description": "같은 model 안에서 config 변형별 성과 비교(A/B).",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 29
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "a2sysbench"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Resolve %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cost"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Resolve %",
+            "desc": true
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "a2sysbench"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT COALESCE(NULLIF(r.config_name,''),'(none)') AS \"Config\", r.model AS \"Model\", count(*) AS \"Trials\", round(100.0 * avg(CASE WHEN t.is_resolved THEN 1 ELSE 0 END), 1) AS \"Resolve %\", round(sum(t.cost_usd), 4) AS \"Cost\", round(avg(t.n_total_tokens), 0) AS \"Avg Tokens\" FROM run_trials t JOIN runs r ON t.run_id = r.run_id WHERE r.status = 'done' AND r.agent IN (${agent:sqlstring}) AND r.benchmark IN (${benchmark:sqlstring}) AND COALESCE(NULLIF(r.subset,''),'(none)') IN (${subset:sqlstring}) AND r.model IN (${model:sqlstring}) AND COALESCE(NULLIF(r.config_name,''),'(none)') IN (${config:sqlstring}) AND COALESCE(NULLIF(t.agent_version,''),'(none)') IN (${agent_version:sqlstring}) AND $__timeFilter(t.finished_at) GROUP BY 1, r.model ORDER BY \"Resolve %\" DESC;"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "type": "barchart",
+      "title": "Resolve % by config",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 37
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "a2sysbench"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xField": "config",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "a2sysbench"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT COALESCE(NULLIF(r.config_name,''),'(none)') AS config, round(100.0 * avg(CASE WHEN t.is_resolved THEN 1 ELSE 0 END), 1) AS \"resolve_pct\" FROM run_trials t JOIN runs r ON t.run_id = r.run_id WHERE r.status = 'done' AND r.agent IN (${agent:sqlstring}) AND r.benchmark IN (${benchmark:sqlstring}) AND COALESCE(NULLIF(r.subset,''),'(none)') IN (${subset:sqlstring}) AND r.model IN (${model:sqlstring}) AND COALESCE(NULLIF(r.config_name,''),'(none)') IN (${config:sqlstring}) AND COALESCE(NULLIF(t.agent_version,''),'(none)') IN (${agent_version:sqlstring}) AND $__timeFilter(t.finished_at) GROUP BY 1 ORDER BY \"resolve_pct\" DESC;"
+        }
+      ],
+      "description": "config 변형별 resolve율. Model 필터를 하나로 고정해야 순수 A/B 비교가 됨."
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "Resolve % by config over time",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 37
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "a2sysbench"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "showPoints": "always",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "placement": "bottom",
+          "displayMode": "list"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "a2sysbench"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT $__timeGroup(t.finished_at, '1d') AS \"time\", COALESCE(NULLIF(r.config_name,''),'(none)') AS metric, round(100.0 * avg(CASE WHEN t.is_resolved THEN 1 ELSE 0 END), 1) AS resolve_pct FROM run_trials t JOIN runs r ON t.run_id = r.run_id WHERE r.status = 'done' AND r.agent IN (${agent:sqlstring}) AND r.benchmark IN (${benchmark:sqlstring}) AND COALESCE(NULLIF(r.subset,''),'(none)') IN (${subset:sqlstring}) AND r.model IN (${model:sqlstring}) AND COALESCE(NULLIF(r.config_name,''),'(none)') IN (${config:sqlstring}) AND COALESCE(NULLIF(t.agent_version,''),'(none)') IN (${agent_version:sqlstring}) AND $__timeFilter(t.finished_at) GROUP BY 1, 2 ORDER BY 1;"
+        }
+      ],
+      "description": "config별 resolve율 추이(일 단위)."
+    },
+    {
+      "id": 30,
+      "type": "row",
+      "title": "📈 Agent Version Regression",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 45
+      },
+      "panels": []
+    },
+    {
+      "id": 31,
+      "type": "timeseries",
+      "title": "Resolve % by agent version over time",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 46
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "a2sysbench"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "showPoints": "always",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "placement": "bottom",
+          "displayMode": "list"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "a2sysbench"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT $__timeGroup(t.finished_at, '1d') AS \"time\", COALESCE(NULLIF(t.agent_version,''),'(none)') AS metric, round(100.0 * avg(CASE WHEN t.is_resolved THEN 1 ELSE 0 END), 1) AS resolve_pct FROM run_trials t JOIN runs r ON t.run_id = r.run_id WHERE r.status = 'done' AND r.agent IN (${agent:sqlstring}) AND r.benchmark IN (${benchmark:sqlstring}) AND COALESCE(NULLIF(r.subset,''),'(none)') IN (${subset:sqlstring}) AND r.model IN (${model:sqlstring}) AND COALESCE(NULLIF(r.config_name,''),'(none)') IN (${config:sqlstring}) AND COALESCE(NULLIF(t.agent_version,''),'(none)') IN (${agent_version:sqlstring}) AND $__timeFilter(t.finished_at) GROUP BY 1, 2 ORDER BY 1;"
+        }
+      ],
+      "description": "agent 버전별 resolve율 추이. 하락 구간이 회귀 신호."
+    },
+    {
+      "id": 32,
+      "type": "table",
+      "title": "Version comparison (Δ vs previous)",
+      "description": "버전을 최초 등장 시각 순으로 정렬. Δ vs prev 가 음수면 회귀(성능 하락) 신호.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 46
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "a2sysbench"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Resolve %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Δ vs prev"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "text",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.0001
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Exception %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cost/Resolved"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "a2sysbench"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT agent_version AS \"Version\", trials AS \"Trials\", resolve_pct AS \"Resolve %\", round(resolve_pct - lag(resolve_pct) OVER (ORDER BY first_seen), 1) AS \"Δ vs prev\", cost_per_resolved AS \"Cost/Resolved\", exception_pct AS \"Exception %\" FROM ( SELECT COALESCE(NULLIF(t.agent_version,''),'(none)') AS agent_version, count(*) AS trials, round(100.0 * avg(CASE WHEN t.is_resolved THEN 1 ELSE 0 END), 1) AS resolve_pct, round(sum(t.cost_usd) / NULLIF(sum(CASE WHEN t.is_resolved THEN 1 ELSE 0 END), 0), 4) AS cost_per_resolved, round(100.0 * avg(CASE WHEN t.exception_type IS NOT NULL AND t.exception_type <> '' THEN 1 ELSE 0 END), 1) AS exception_pct, min(t.finished_at) AS first_seen FROM run_trials t JOIN runs r ON t.run_id = r.run_id WHERE r.status = 'done' AND r.agent IN (${agent:sqlstring}) AND r.benchmark IN (${benchmark:sqlstring}) AND COALESCE(NULLIF(r.subset,''),'(none)') IN (${subset:sqlstring}) AND r.model IN (${model:sqlstring}) AND COALESCE(NULLIF(r.config_name,''),'(none)') IN (${config:sqlstring}) AND COALESCE(NULLIF(t.agent_version,''),'(none)') IN (${agent_version:sqlstring}) AND $__timeFilter(t.finished_at) GROUP BY 1 ) s ORDER BY first_seen;"
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "type": "row",
+      "title": "💰 Cost Efficiency & Failures",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 54
+      },
+      "panels": []
+    },
+    {
+      "id": 41,
+      "type": "timeseries",
+      "title": "Daily cost & tokens",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 55
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "a2sysbench"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cost (USD)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tokens"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "line"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "placement": "bottom",
+          "displayMode": "list"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "a2sysbench"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT $__timeGroup(t.finished_at, '1d') AS \"time\", round(sum(t.cost_usd), 4) AS \"Cost (USD)\", sum(t.n_total_tokens) AS \"Tokens\" FROM run_trials t JOIN runs r ON t.run_id = r.run_id WHERE r.status = 'done' AND r.agent IN (${agent:sqlstring}) AND r.benchmark IN (${benchmark:sqlstring}) AND COALESCE(NULLIF(r.subset,''),'(none)') IN (${subset:sqlstring}) AND r.model IN (${model:sqlstring}) AND COALESCE(NULLIF(r.config_name,''),'(none)') IN (${config:sqlstring}) AND COALESCE(NULLIF(t.agent_version,''),'(none)') IN (${agent_version:sqlstring}) AND $__timeFilter(t.finished_at) GROUP BY 1 ORDER BY 1;"
+        }
+      ],
+      "description": "일별 비용(좌축) · 총토큰(우축)."
+    },
+    {
+      "id": 42,
+      "type": "piechart",
+      "title": "Exceptions by type",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 55
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "a2sysbench"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "pieType": "donut",
+        "legend": {
+          "showLegend": true,
+          "placement": "right",
+          "displayMode": "table",
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "a2sysbench"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT t.exception_type AS metric, count(*) AS value FROM run_trials t JOIN runs r ON t.run_id = r.run_id WHERE r.status = 'done' AND t.exception_type IS NOT NULL AND t.exception_type <> '' AND r.agent IN (${agent:sqlstring}) AND r.benchmark IN (${benchmark:sqlstring}) AND COALESCE(NULLIF(r.subset,''),'(none)') IN (${subset:sqlstring}) AND r.model IN (${model:sqlstring}) AND COALESCE(NULLIF(r.config_name,''),'(none)') IN (${config:sqlstring}) AND COALESCE(NULLIF(t.agent_version,''),'(none)') IN (${agent_version:sqlstring}) AND $__timeFilter(t.finished_at) GROUP BY t.exception_type ORDER BY value DESC;"
+        }
+      ],
+      "description": "실패(예외) 유형 분포."
+    },
+    {
+      "id": 43,
+      "type": "table",
+      "title": "Hardest tasks (low resolve / high cost)",
+      "description": "resolve율이 낮고 비용이 큰 task Top 25 — 개선 우선순위 후보.",
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 63
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "a2sysbench"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Resolve %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 25
+                    },
+                    {
+                      "color": "green",
+                      "value": 50
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cost"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Resolve %",
+            "desc": false
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "a2sysbench"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT t.task_name AS \"Task\", r.benchmark AS \"Benchmark\", count(*) AS \"Attempts\", round(100.0 * avg(CASE WHEN t.is_resolved THEN 1 ELSE 0 END), 1) AS \"Resolve %\", round(sum(t.cost_usd), 4) AS \"Cost\" FROM run_trials t JOIN runs r ON t.run_id = r.run_id WHERE r.status = 'done' AND r.agent IN (${agent:sqlstring}) AND r.benchmark IN (${benchmark:sqlstring}) AND COALESCE(NULLIF(r.subset,''),'(none)') IN (${subset:sqlstring}) AND r.model IN (${model:sqlstring}) AND COALESCE(NULLIF(r.config_name,''),'(none)') IN (${config:sqlstring}) AND COALESCE(NULLIF(t.agent_version,''),'(none)') IN (${agent_version:sqlstring}) AND $__timeFilter(t.finished_at) GROUP BY t.task_name, r.benchmark ORDER BY \"Resolve %\" ASC, \"Cost\" DESC NULLS LAST LIMIT 25;"
+        }
+      ]
+    }
+  ]
+}

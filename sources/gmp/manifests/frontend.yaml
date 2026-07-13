@@ -1,7 +1,7 @@
 # Google Managed Prometheus (GMP) query frontend.
 # Proxies PromQL from Grafana to the Cloud Monitoring / Managed Prometheus API for
 # project a2sys-devops-dev. The pod authenticates via Workload Identity; its KSA
-# principal must hold roles/monitoring.viewer (see gmp/README.md).
+# principal must hold roles/monitoring.viewer (see sources/gmp/README.md).
 apiVersion: v1
 kind: ServiceAccount
 metadata:
