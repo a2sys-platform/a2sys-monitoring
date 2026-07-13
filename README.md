@@ -10,19 +10,24 @@ Kibana 등 다른 도구도 나란히 추가할 수 있도록 폴더 구조를 �
 
 ```
 a2sys-monitoring/
-├── grafana/                    # Grafana (Helm 차트 grafana/grafana)
-│   ├── values.yaml             #   기본: ClusterIP, admin 시크릿, 영속성, 대시보드 provider
-│   ├── values-datasources.yaml #   데이터소스 프로비저닝 (GMP + a2sys-bench)
-│   ├── gateway.yaml            #   HTTPRoute(grafana.internal.a2sys.ai) + IAP(GCPBackendPolicy)
-│   └── dashboards/             #   프로비저닝 대시보드 (보드당 JSON 1개)
-├── sources/                    # 도구 공통 데이터소스 백엔드 (여러 도구가 재사용)
-│   ├── gmp/                    #   Google Managed Prometheus 쿼리 frontend
-│   └── a2sys-bench-db/         #   a2sys-bench Cloud SQL (Private Service Connect)
-└── <tool>/                     # 향후 도구(예: kibana/)는 같은 패턴으로 여기에
+├── grafana/                        # Grafana (Helm 차트 grafana/grafana)
+│   ├── helm/                       #   Helm values (차트에 넣어 렌더되는 값)
+│   │   ├── values.yaml             #     기본: ClusterIP, admin 시크릿, 영속성, 대시보드 provider
+│   │   └── values-datasources.yaml #     데이터소스 프로비저닝 (GMP + a2sys-bench)
+│   ├── manifests/                  #   순수 k8s 매니페스트 (kubectl/ArgoCD로 그대로 apply)
+│   │   └── gateway.yaml            #     HTTPRoute(grafana.internal.a2sys.ai) + IAP
+│   └── dashboards/                 #   대시보드 JSON (ConfigMap 소스 = 데이터)
+├── sources/                        # 도구 공통 데이터소스 백엔드 (여러 도구가 재사용)
+│   ├── gmp/manifests/frontend.yaml #   Google Managed Prometheus 쿼리 frontend (순수 k8s)
+│   └── a2sys-bench-db/             #   Cloud SQL PSC (gcloud 명령, 매니페스트 없음)
+└── <tool>/                         # 향후 도구(예: kibana/)는 같은 패턴으로 여기에
 ```
 
-**원칙:** *도구* 는 각각 독립된 최상위 디렉토리(자체 Helm values/매니페스트/대시보드).
-도구가 *연결하는 대상*(메트릭 백엔드, DB)은 여러 도구가 공유할 수 있도록 `sources/` 아래에 둔다.
+**원칙**
+- *도구* 는 각각 독립된 최상위 디렉토리. 도구가 *연결하는 대상*(메트릭 백엔드, DB)은
+  여러 도구가 공유하도록 `sources/` 아래에 둔다.
+- 도구 안에서는 종류별로 나눈다: **`helm/`** = 차트에 넣는 values, **`manifests/`** = 그대로
+  apply하는 완성된 k8s 오브젝트, **`dashboards/`** = 대시보드 JSON(데이터).
 
 ## Grafana
 
@@ -61,10 +66,10 @@ kubectl -n a2sys-monitoring create secret generic grafana-admin \
 
 helm upgrade --install a2sys-monitoring grafana/grafana \
   --namespace a2sys-monitoring \
-  -f grafana/values.yaml -f grafana/values-datasources.yaml
+  -f grafana/helm/values.yaml -f grafana/helm/values-datasources.yaml
 
 # gateway + IAP (grafana.internal.a2sys.ai)
-kubectl apply -f grafana/gateway.yaml
+kubectl apply -f grafana/manifests/gateway.yaml
 ```
 
 데이터소스가 연결되려면, GMP frontend 적용 + `monitoring.viewer` 부여

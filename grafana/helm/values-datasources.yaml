@@ -3,7 +3,7 @@
 #   - a2sys-bench : a2sys-bench Cloud SQL (Postgres), via PSC internal IP — see sources/a2sys-bench-db/
 # Apply on top of values.yaml:
 #   helm upgrade --install a2sys-monitoring grafana/grafana \
-#     -n a2sys-monitoring -f grafana/values.yaml -f grafana/values-datasources.yaml
+#     -n a2sys-monitoring -f grafana/helm/values.yaml -f grafana/helm/values-datasources.yaml
 # The DB host/user/password come from the k8s Secret `bench-db` (NOT stored in this repo).
 
 envValueFrom:

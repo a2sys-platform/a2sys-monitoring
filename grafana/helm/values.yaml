@@ -7,7 +7,7 @@
 # themselves are defined in values-datasources.yaml.
 #
 # Access: served at https://grafana.internal.a2sys.ai via the shared internal-gateway
-# (see gateway.yaml), gated by IAP. No public LoadBalancer — the Service is ClusterIP
+# (see ../manifests/gateway.yaml), gated by IAP. No public LoadBalancer — the Service is ClusterIP
 # and the gateway reaches it through a NEG.
 
 service:

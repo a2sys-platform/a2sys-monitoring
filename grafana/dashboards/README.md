@@ -9,11 +9,11 @@ Provisioned Grafana dashboards (survive redeploys, unlike UI-created ones).
   four decision rows: **Model Selection**, **Config A/B**, **Version Regression**, and
   **Cost Efficiency & Failures**.
 
-Both use the `a2sys-bench` Postgres datasource (uid `a2sysbench`, pinned in `../values-datasources.yaml`).
+Both use the `a2sys-bench` Postgres datasource (uid `a2sysbench`, pinned in `../helm/values-datasources.yaml`).
 
 ## How it's wired
 
-`../values.yaml` defines a `file` dashboard provider that reads
+`../helm/values.yaml` defines a `file` dashboard provider that reads
 `/var/lib/grafana/dashboards/default`, mounted from the ConfigMap
 `a2sys-bench-dashboards`. That ConfigMap is built from the JSON files here.
 

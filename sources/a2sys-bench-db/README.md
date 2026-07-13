@@ -85,7 +85,7 @@ kubectl -n a2sys-monitoring create secret generic bench-db \
 
 cd ../..   # a2sys-monitoring/ (repo root)
 helm upgrade --install a2sys-monitoring grafana/grafana \
-  -n a2sys-monitoring -f grafana/values.yaml -f grafana/values-datasources.yaml
+  -n a2sys-monitoring -f grafana/helm/values.yaml -f grafana/helm/values-datasources.yaml
 ```
 
 ## Verify
@@ -96,7 +96,7 @@ Or query in Explore: `SELECT count(*) FROM runs;`
 ## Rollback
 
 ```sh
-helm upgrade a2sys-monitoring grafana/grafana -n a2sys-monitoring -f grafana/values.yaml -f grafana/values-datasources.yaml
+helm upgrade a2sys-monitoring grafana/grafana -n a2sys-monitoring -f grafana/helm/values.yaml -f grafana/helm/values-datasources.yaml
 kubectl -n a2sys-monitoring delete secret bench-db
 gcloud compute forwarding-rules delete cloudsql-a2sys-bench-psc --project a2sys-devops-dev --region asia-northeast3
 gcloud compute addresses delete cloudsql-a2sys-bench-psc --project a2sys-devops-dev --region asia-northeast3
