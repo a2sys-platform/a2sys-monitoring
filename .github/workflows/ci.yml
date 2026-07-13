@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate dashboard JSON
+        run: |
+          shopt -s nullglob
+          fail=0
+          for f in grafana/dashboards/*.json; do
+            echo "· $f"
+            jq empty "$f" || fail=1
+          done
+          exit $fail
+
+      - name: Validate YAML parses
+        run: |
+          python3 - <<'PY'
+          import glob, sys, yaml
+          bad = 0
+          for f in glob.glob("**/*.yaml", recursive=True) + glob.glob("**/*.yml", recursive=True):
+              try:
+                  list(yaml.safe_load_all(open(f)))
+                  print("·", f)
+              except Exception as e:
+                  print("✗", f, e); bad = 1
+          sys.exit(bad)
+          PY
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.0
+
+      - name: Helm template renders (upstream chart + our values)
+        run: |
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm repo update
+          helm template a2sys-monitoring grafana/grafana --version 10.5.15 \
+            -f grafana/helm/values.yaml \
+            -f grafana/helm/values-datasources.yaml > /dev/null
+
+      - name: kubeconform (raw manifests)
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz kubeconform
+          ./kubeconform -strict -summary -ignore-missing-schemas \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            grafana/manifests sources/gmp/manifests
