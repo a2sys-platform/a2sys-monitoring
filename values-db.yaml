@@ -1,13 +1,22 @@
-# Overlay: wire the a2sys-bench Cloud SQL (Postgres) into Grafana as a datasource.
-# Apply ON TOP of values.yaml AFTER the PSC endpoint exists and the `bench-db`
-# secret is created (see db-connection/README.md):
+# Overlay: extra Grafana datasources.
+#   - GMP         : Google Managed Prometheus (metrics), via the gmp-frontend proxy — see gmp/
+#   - a2sys-bench : a2sys-bench Cloud SQL (Postgres), via PSC internal IP — see db-connection/
+# Both datasources MUST live in this one list (Helm replaces lists, it does not merge them).
+# Apply on top of values.yaml:
 #   helm upgrade --install a2sys-monitoring prometheus-community/kube-prometheus-stack \
 #     -n a2sys-monitoring -f values.yaml -f values-db.yaml
-#
-# Grafana connects DIRECTLY to the DB over the PSC internal IP (no Auth Proxy needed).
-# Host/user/password come from the k8s Secret `bench-db` (NOT stored in this repo).
+# Prereqs: gmp/frontend.yaml applied + monitoring.viewer granted (gmp/README.md);
+# PSC endpoint + `bench-db` secret created (db-connection/README.md).
+# The DB host/user/password come from the k8s Secret `bench-db` (NOT stored in this repo).
 
 grafana:
+  # remove the stale default datasources persisted on the PVC from the earlier
+  # (Prometheus-enabled) install; they are read-only and can't be deleted via API.
+  deleteDatasources:
+    - name: Prometheus
+      orgId: 1
+    - name: Alertmanager
+      orgId: 1
   envValueFrom:
     DB_HOST:
       secretKeyRef:
@@ -22,6 +31,14 @@ grafana:
         name: bench-db
         key: password
   additionalDataSources:
+    - name: GMP
+      type: prometheus
+      access: proxy
+      url: http://gmp-frontend.a2sys-monitoring.svc:9090
+      isDefault: true
+      jsonData:
+        httpMethod: POST
+        prometheusType: Prometheus
     - name: a2sys-bench
       type: postgres
       access: proxy

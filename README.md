@@ -1,18 +1,32 @@
 # a2sys-monitoring
 
-Grafana + Prometheus (kube-prometheus-stack) on the existing **devops-dev** GKE cluster.
+**Grafana only** (kube-prometheus-stack chart) on the existing **devops-dev** GKE cluster.
+Metrics come from Google Managed Prometheus; there is no self-managed Prometheus.
 
 - **Cluster**: `devops-dev` (project `a2sys-devops-dev`, region `asia-northeast3`)
 - **Namespace**: `a2sys-monitoring`
 - **Helm release**: `a2sys-monitoring`
-- **Chart**: `prometheus-community/kube-prometheus-stack`
+- **Chart**: `prometheus-community/kube-prometheus-stack` (only the Grafana subchart is enabled)
 
-> ⚠️ Shared **GKE Autopilot** cluster. Autopilot forbids node-exporter (hostPath/hostNetwork) and
-> patching the managed `kube-system` namespace, so `values.yaml` disables node-exporter and the
-> control-plane scrapers (kube-controller-manager/scheduler/proxy/etcd, coreDns). Node/system
-> metrics come from Google Managed Prometheus (`gmp-system`, already on this cluster); kubelet
-> (cAdvisor) scraping stays enabled for pod/container metrics. This release runs its own
-> self-managed Prometheus + kube-state-metrics alongside GMP.
+**Datasources**
+- `GMP` (default) — Google Managed Prometheus, via the `gmp-frontend` proxy → see [`gmp/`](gmp/)
+- `a2sys-bench` — a2sys-bench Cloud SQL (Postgres) over PSC → see [`db-connection/`](db-connection/)
+
+> ⚠️ Shared **GKE Autopilot** cluster. To keep cost down, self-managed Prometheus,
+> Alertmanager, prometheus-operator and kube-state-metrics are **disabled** (`values.yaml`) —
+> metrics are served by the cluster's Google Managed Prometheus instead. node-exporter and
+> control-plane scrapers stay off (Autopilot forbids their hostPath/kube-system access).
+> Unset container requests are also pinned small, because Autopilot otherwise defaults them
+> to 500m CPU / 2Gi memory each.
+
+## Files
+
+| Path | Purpose |
+|---|---|
+| `values.yaml` | Grafana-only base (component toggles, small requests, LoadBalancer) |
+| `values-db.yaml` | Extra datasources overlay (GMP + a2sys-bench) + stale-datasource cleanup |
+| `gmp/` | Google Managed Prometheus query frontend + datasource |
+| `db-connection/` | PSC path + Grafana → Cloud SQL datasource |
 
 ## Prerequisites
 

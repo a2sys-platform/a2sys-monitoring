@@ -1,15 +1,21 @@
-# kube-prometheus-stack values for a2sys-monitoring
+# kube-prometheus-stack values for a2sys-monitoring — GRAFANA-ONLY
 # Cluster: devops-dev (a2sys-devops-dev, asia-northeast3) / namespace: a2sys-monitoring
 # Chart: prometheus-community/kube-prometheus-stack
 #
-# NOTE: devops-dev is a GKE Autopilot cluster. The following are disabled because
-# Autopilot forbids them:
-#   - node-exporter: needs hostPath /proc,/sys,/ and hostNetwork/hostPID (blocked)
-#   - control-plane scrapers (kube-controller-manager/scheduler/proxy/etcd, coreDns):
-#     their Services target the managed kube-system namespace, which cannot be patched.
-# Node/system metrics on Autopilot come from Google Managed Prometheus (gmp-system).
-# kubelet (cAdvisor) scraping stays enabled and provides pod/container metrics.
+# We run ONLY Grafana from this chart. Self-managed Prometheus, Alertmanager,
+# prometheus-operator and kube-state-metrics are disabled to cut Autopilot cost —
+# metrics come from Google Managed Prometheus (GMP, already on this cluster;
+# see db-connection/ and gmp/ for datasources). node-exporter and control-plane
+# scrapers stay off (Autopilot forbids them).
 
+prometheus:
+  enabled: false
+alertmanager:
+  enabled: false
+prometheusOperator:
+  enabled: false
+kubeStateMetrics:
+  enabled: false
 nodeExporter:
   enabled: false
 kubeControllerManager:
@@ -39,30 +45,17 @@ grafana:
     requests:
       cpu: 100m
       memory: 128Mi
-
-prometheus:
-  prometheusSpec:
-    retention: 7d
+  # keep the dashboard/datasource sidecars small — otherwise Autopilot defaults
+  # unset requests to 500m / 2Gi each.
+  sidecar:
     resources:
       requests:
-        cpu: 200m
-        memory: 512Mi
-    storageSpec:
-      volumeClaimTemplate:
-        spec:
-          storageClassName: standard-rwo
-          accessModes: ["ReadWriteOnce"]
-          resources:
-            requests:
-              storage: 20Gi
-
-alertmanager:
-  alertmanagerSpec:
-    storage:
-      volumeClaimTemplate:
-        spec:
-          storageClassName: standard-rwo
-          accessModes: ["ReadWriteOnce"]
-          resources:
-            requests:
-              storage: 2Gi
+        cpu: 50m
+        memory: 64Mi
+    datasources:
+      # We removed self-managed Prometheus/Alertmanager, so don't provision the
+      # chart's default datasources that point at those (now-dead) services.
+      # GMP (defined in values-db.yaml) is the metrics datasource instead.
+      defaultDatasourceEnabled: false
+      alertmanager:
+        enabled: false
