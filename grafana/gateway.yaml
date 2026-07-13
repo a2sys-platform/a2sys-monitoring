@@ -1,0 +1,42 @@
+# Expose Grafana on the shared internal-gateway at grafana.internal.a2sys.ai
+# (HTTPS via the *.internal.a2sys.ai wildcard cert) and gate it with IAP.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: grafana
+  namespace: a2sys-monitoring
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: internal-gateway
+      namespace: gateway-infra
+      sectionName: https
+  hostnames:
+    - grafana.internal.a2sys.ai
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: a2sys-monitoring-grafana
+          port: 80
+---
+# Identity-Aware Proxy in front of Grafana (Google-managed OAuth; no custom client).
+# Only principals granted roles/iap.httpsResourceAccessor pass.
+apiVersion: networking.gke.io/v1
+kind: GCPBackendPolicy
+metadata:
+  name: grafana-iap
+  namespace: a2sys-monitoring
+spec:
+  default:
+    iap:
+      enabled: true
+  targetRef:
+    group: ""
+    kind: Service
+    name: a2sys-monitoring-grafana

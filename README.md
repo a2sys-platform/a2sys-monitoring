@@ -11,8 +11,9 @@ Kibana 등 다른 도구도 나란히 추가할 수 있도록 폴더 구조를 �
 ```
 a2sys-monitoring/
 ├── grafana/                    # Grafana (Helm 차트 grafana/grafana)
-│   ├── values.yaml             #   기본: LoadBalancer, admin 시크릿, 영속성, 대시보드 provider
+│   ├── values.yaml             #   기본: ClusterIP, admin 시크릿, 영속성, 대시보드 provider
 │   ├── values-datasources.yaml #   데이터소스 프로비저닝 (GMP + a2sys-bench)
+│   ├── gateway.yaml            #   HTTPRoute(grafana.internal.a2sys.ai) + IAP(GCPBackendPolicy)
 │   └── dashboards/             #   프로비저닝 대시보드 (보드당 JSON 1개)
 ├── sources/                    # 도구 공통 데이터소스 백엔드 (여러 도구가 재사용)
 │   ├── gmp/                    #   Google Managed Prometheus 쿼리 frontend
@@ -61,6 +62,9 @@ kubectl -n a2sys-monitoring create secret generic grafana-admin \
 helm upgrade --install a2sys-monitoring grafana/grafana \
   --namespace a2sys-monitoring \
   -f grafana/values.yaml -f grafana/values-datasources.yaml
+
+# gateway + IAP (grafana.internal.a2sys.ai)
+kubectl apply -f grafana/gateway.yaml
 ```
 
 데이터소스가 연결되려면, GMP frontend 적용 + `monitoring.viewer` 부여
@@ -69,14 +73,15 @@ helm upgrade --install a2sys-monitoring grafana/grafana \
 
 ### 접속
 
-```sh
-kubectl -n a2sys-monitoring get svc a2sys-monitoring-grafana \
-  -o jsonpath='{.status.loadBalancer.ingress[0].ip}'                    # 외부 IP
-kubectl -n a2sys-monitoring get secret grafana-admin \
-  -o jsonpath='{.data.admin-password}' | base64 -d                      # admin 비밀번호
-```
+**https://grafana.internal.a2sys.ai** → 구글(a2sys.ai) 로그인(IAP) → 대시보드 조회.
 
-`http://<EXTERNAL-IP>` 접속 → `admin` / 조회한 비밀번호로 로그인.
+- 공유 `internal-gateway`에 얹혀 있고 **IAP**로 보호됨. 공개 IP 없음(Service는 ClusterIP).
+- `roles/iap.httpsResourceAccessor`(a2sys.ai 도메인에 부여됨)가 있는 사용자만 통과.
+- IAP 통과 후엔 **로그인 없이 Viewer**로 조회. 편집은 `/login`에서 admin으로:
+  ```sh
+  kubectl -n a2sys-monitoring get secret grafana-admin \
+    -o jsonpath='{.data.admin-password}' | base64 -d          # admin 비밀번호
+  ```
 
 ### 제거
 

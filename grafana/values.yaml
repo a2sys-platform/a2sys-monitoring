@@ -5,9 +5,24 @@
 # Grafana only. Metrics come from Google Managed Prometheus (see sources/gmp/); the
 # a2sys-bench Cloud SQL datasource is in sources/a2sys-bench-db/. Datasources
 # themselves are defined in values-datasources.yaml.
+#
+# Access: served at https://grafana.internal.a2sys.ai via the shared internal-gateway
+# (see gateway.yaml), gated by IAP. No public LoadBalancer — the Service is ClusterIP
+# and the gateway reaches it through a NEG.
 
 service:
-  type: LoadBalancer
+  type: ClusterIP
+
+# Behind IAP (only authorized a2sys.ai users reach the pod), so let them view without a
+# second Grafana login. Admin still logs in at /login for editing.
+grafana.ini:
+  server:
+    root_url: https://grafana.internal.a2sys.ai
+  auth.anonymous:
+    enabled: true
+    org_role: Viewer
+  users:
+    viewers_can_edit: false
 
 # admin credentials come from the pre-created Secret `grafana-admin` (not in this repo)
 admin:
