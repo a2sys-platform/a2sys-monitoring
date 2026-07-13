@@ -4,7 +4,12 @@ Provisioned Grafana dashboards (survive redeploys, unlike UI-created ones).
 
 - `a2sys-bench.json` — a2sys-bench overview: runs/trials totals, resolve rate,
   cost, tokens, resolve-rate & tokens by model, trials over time, recent runs.
-  Uses the `a2sys-bench` Postgres datasource (uid `a2sysbench`, pinned in `../values-datasources.yaml`).
+- `a2sys-bench-agent-optimization.json` — agent optimization view for tuning in-house
+  agents (agent-prototype). Filters (agent/benchmark/subset/model/config/version) drive
+  four decision rows: **Model Selection**, **Config A/B**, **Version Regression**, and
+  **Cost Efficiency & Failures**.
+
+Both use the `a2sys-bench` Postgres datasource (uid `a2sysbench`, pinned in `../values-datasources.yaml`).
 
 ## How it's wired
 
@@ -20,6 +25,7 @@ After editing any JSON in this folder, rebuild the ConfigMap and restart Grafana
 ```sh
 kubectl -n a2sys-monitoring create configmap a2sys-bench-dashboards \
   --from-file=grafana/dashboards/a2sys-bench.json \
+  --from-file=grafana/dashboards/a2sys-bench-agent-optimization.json \
   --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl -n a2sys-monitoring rollout restart deploy/a2sys-monitoring-grafana
