@@ -1,30 +1,27 @@
 # a2sys-monitoring
 
-**Grafana only** (kube-prometheus-stack chart) on the existing **devops-dev** GKE cluster.
-Metrics come from Google Managed Prometheus; there is no self-managed Prometheus.
+Grafana on the existing **devops-dev** GKE cluster. Metrics come from Google
+Managed Prometheus; there is no self-managed Prometheus.
 
 - **Cluster**: `devops-dev` (project `a2sys-devops-dev`, region `asia-northeast3`)
 - **Namespace**: `a2sys-monitoring`
 - **Helm release**: `a2sys-monitoring`
-- **Chart**: `prometheus-community/kube-prometheus-stack` (only the Grafana subchart is enabled)
+- **Chart**: `grafana/grafana`
 
 **Datasources**
 - `GMP` (default) — Google Managed Prometheus, via the `gmp-frontend` proxy → see [`gmp/`](gmp/)
 - `a2sys-bench` — a2sys-bench Cloud SQL (Postgres) over PSC → see [`db-connection/`](db-connection/)
 
-> ⚠️ Shared **GKE Autopilot** cluster. To keep cost down, self-managed Prometheus,
-> Alertmanager, prometheus-operator and kube-state-metrics are **disabled** (`values.yaml`) —
-> metrics are served by the cluster's Google Managed Prometheus instead. node-exporter and
-> control-plane scrapers stay off (Autopilot forbids their hostPath/kube-system access).
-> Unset container requests are also pinned small, because Autopilot otherwise defaults them
-> to 500m CPU / 2Gi memory each.
+> ⚠️ Shared **GKE Autopilot** cluster. Metrics are served by the cluster's Google
+> Managed Prometheus, so this release runs only Grafana. Container requests are kept
+> small — Autopilot otherwise defaults unset requests to 500m CPU / 2Gi memory.
 
 ## Files
 
 | Path | Purpose |
 |---|---|
-| `values.yaml` | Grafana-only base (component toggles, small requests, LoadBalancer) |
-| `values-db.yaml` | Extra datasources overlay (GMP + a2sys-bench) + stale-datasource cleanup |
+| `values.yaml` | Grafana base (LoadBalancer, admin secret, persistence, requests) |
+| `values-db.yaml` | Datasources overlay (GMP + a2sys-bench) |
 | `gmp/` | Google Managed Prometheus query frontend + datasource |
 | `db-connection/` | PSC path + Grafana → Cloud SQL datasource |
 
@@ -37,8 +34,8 @@ gcloud container clusters get-credentials devops-dev \
 export USE_GKE_GCLOUD_AUTH_PLUGIN=True
 export PATH="$(gcloud info --format='value(installation.sdk_root)')/bin:$PATH"
 
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm repo update prometheus-community
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update grafana
 ```
 
 ## Deploy / upgrade
@@ -51,10 +48,13 @@ kubectl -n a2sys-monitoring create secret generic grafana-admin \
   --from-literal=admin-user=admin \
   --from-literal=admin-password="$(openssl rand -base64 18)"
 
-helm upgrade --install a2sys-monitoring prometheus-community/kube-prometheus-stack \
+helm upgrade --install a2sys-monitoring grafana/grafana \
   --namespace a2sys-monitoring \
-  -f values.yaml
+  -f values.yaml -f values-db.yaml
 ```
+
+For the datasources to resolve, also apply the GMP frontend + grant `monitoring.viewer`
+(see [`gmp/`](gmp/)) and create the `bench-db` secret (see [`db-connection/`](db-connection/)).
 
 ## Access Grafana
 

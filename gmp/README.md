@@ -1,9 +1,8 @@
 # GMP datasource for Grafana
 
-We removed self-managed Prometheus/Alertmanager (cost). Metrics now come from
-**Google Managed Prometheus** (GMP), which already runs managed collection on the
-`devops-dev` cluster (`gke-gmp-system`). Grafana queries it through a small
-**query frontend** proxy.
+Metrics come from **Google Managed Prometheus** (GMP), which already runs managed
+collection on the `devops-dev` cluster (`gke-gmp-system`). Grafana queries it
+through a small **query frontend** proxy.
 
 ## Components
 
@@ -30,7 +29,7 @@ gcloud projects add-iam-policy-binding a2sys-devops-dev \
 ```sh
 kubectl apply -f gmp/frontend.yaml
 # grant monitoring.viewer (above), then provision the datasource:
-helm upgrade a2sys-monitoring prometheus-community/kube-prometheus-stack \
+helm upgrade a2sys-monitoring grafana/grafana \
   -n a2sys-monitoring -f values.yaml -f values-db.yaml
 ```
 
